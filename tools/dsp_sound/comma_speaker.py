@@ -285,16 +285,8 @@ def resolve_device(name_or_dongle):
 def _ssh_common_opts(key):
   return [
     '-i', key,
-    '-o', 'IdentitiesOnly=yes',
-    '-o', 'PreferredAuthentications=publickey',
-    '-o', 'PubkeyAuthentication=yes',
-    '-o', 'GSSAPIAuthentication=no',
-    '-o', 'PasswordAuthentication=no',
-    '-o', 'KbdInteractiveAuthentication=no',
     '-o', 'StrictHostKeyChecking=no',
     '-o', 'UserKnownHostsFile=/dev/null',
-    '-o', 'ConnectTimeout=15',
-    '-o', 'ServerAliveInterval=15',
   ]
 
 
@@ -310,17 +302,21 @@ def _ssh_target_args(dongle_id=None, ip=None):
   return opts + ['-o', f"ProxyCommand={proxy}"], f"comma@comma-{dongle_id}"
 
 
-def ssh_run(target, *cmd, timeout=30, capture=True):
+def ssh_run(target, *cmd, timeout=90, capture=True):
   """target: dict with 'dongle_id' or 'ip'."""
   opts, host = _ssh_target_args(**target)
   args = ['ssh'] + opts + [host]
   if cmd:
     args.append('--')
     args.extend(cmd)
+  if os.environ.get('COMMA_SPEAKER_SSH_DEBUG'):
+    args.insert(1, '-vvv')
+    sys.stderr.write(f"[ssh] {' '.join(args)}\n")
+    return subprocess.run(args, text=True, timeout=timeout)
   return subprocess.run(args, capture_output=capture, text=True, timeout=timeout)
 
 
-def scp_run(target, local_path, remote_path, timeout=30):
+def scp_run(target, local_path, remote_path, timeout=90):
   opts, host = _ssh_target_args(**target)
   args = ['scp'] + opts + [str(local_path), f"{host}:{remote_path}"]
   return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
@@ -354,13 +350,13 @@ def get_lan_ip_via_proxy(dongle_id):
 
 def install_server(target):
   _info(f"installing server to {REMOTE_SERVER}")
-  r = ssh_run(target, f"mkdir -p {REMOTE_DIR}", timeout=30)
+  r = ssh_run(target, f"mkdir -p {REMOTE_DIR}", timeout=90)
   if r.returncode != 0:
     raise RuntimeError(f"mkdir failed: {r.stderr.strip()}")
   r = scp_run(target, LOCAL_SERVER, REMOTE_SERVER)
   if r.returncode != 0:
     raise RuntimeError(f"scp failed: {r.stderr.strip()}")
-  r = ssh_run(target, f"chmod +x {REMOTE_SERVER}", timeout=10)
+  r = ssh_run(target, f"chmod +x {REMOTE_SERVER}", timeout=60)
   if r.returncode != 0:
     raise RuntimeError(f"chmod failed: {r.stderr.strip()}")
   _ok("server installed")
