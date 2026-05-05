@@ -250,7 +250,7 @@ class AugmentedRoadView(CameraView):
 
     # publish uiDebug
     msg = messaging.new_message('uiDebug')
-    msg.uiDebug.drawTimeMillis = (time.monotonic() - start_draw) * 1000
+    # msg.uiDebug.drawTimeMillis = (time.monotonic() - start_draw) * 1000
     # self._pm.send('uiDebug', msg)
 
   def _switch_stream_if_needed(self, sm):
