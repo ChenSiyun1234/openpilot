@@ -25,10 +25,11 @@ MIN_ALLOW_THROTTLE_SPEED = 2.5
 _A_TOTAL_MAX_V = [1.7, 3.2]
 _A_TOTAL_MAX_BP = [20., 40.]
 
-# Curve speed limit: cap v_cruise so predicted lateral accel stays under this,
-# accounting for road bank via params.roll (banking into the curve raises the limit).
-A_LAT_REG_MAX = 2.0   # m/s², ISO 11270 ceiling is 3.0
-A_LONG_DECEL_TARGET = 1.5  # m/s², comfortable decel used to time braking before a curve
+# Curve speed limit: cap longitudinal accel so predicted lateral accel stays under
+# this at every future point in the model's plan. Roll-compensated.
+A_LAT_REG_MAX = 2.0       # m/s², ISO 11270 ceiling is 3.0
+A_CURVE_MIN_DECEL = -2.0  # m/s², floor for curve-driven decel (limit aggressiveness while tuning)
+CURVE_MIN_LOOKAHEAD = 5.0  # m, ignore plan points closer than this (gradient boundary noise)
 
 def get_max_accel(v_ego):
   return np.interp(v_ego, A_CRUISE_MAX_BP, A_CRUISE_MAX_VALS)
@@ -50,38 +51,49 @@ def limit_accel_in_turns(v_ego, angle_steers, a_target, CP):
   return [a_target[0], min(a_target[1], a_x_allowed)]
 
 
-def limit_v_cruise_in_curves(model_msg, roll):
+def limit_accel_in_curves(model_msg, v_ego, roll):
   """
-  Look ahead in the model's predicted plan and cap v_cruise so we arrive at any
-  upcoming curve at a speed that keeps lateral accel under A_LAT_REG_MAX. Roll-
-  compensated: banking into the curve raises the per-step lat accel budget.
+  Look at every future point in the model's predicted path and return the
+  longitudinal accel cap needed to keep lateral accel under A_LAT_REG_MAX
+  there. Roll-compensated: banking into the curve raises the per-step budget.
 
-  Returns the speed (m/s) we should be at *now* to comfortably decelerate (at
-  A_LONG_DECEL_TARGET) to the curve's max safe speed by the time we reach it.
-  Returns a large number (no-op) when the model plan is unusable.
+  Curvature is computed geometrically from position.x/y (orientationRate.z is
+  noisy and not reliable from the model). Returns the most aggressive
+  (most negative) decel required to be at v_max[i] when we reach the predicted
+  distance position.x[i]. If we're already in a curve hotter than the limit,
+  this comes out very negative and gets clipped to ACCEL_MIN downstream — i.e.
+  immediate hard brake.
+
+  Returns 0.0 (no cap) when the model plan is unusable so the filter downstream
+  has a clean baseline.
   """
-  if (len(model_msg.orientationRate.z) != ModelConstants.IDX_N or
-      len(model_msg.velocity.x) != ModelConstants.IDX_N or
-      len(model_msg.position.x) != ModelConstants.IDX_N):
-    return V_CRUISE_MAX * CV.KPH_TO_MS
+  if (len(model_msg.position.x) != ModelConstants.IDX_N or
+      len(model_msg.position.y) != ModelConstants.IDX_N):
+    return 0.0
 
-  v_pred = np.array(model_msg.velocity.x)
-  yaw_rate_pred = np.array(model_msg.orientationRate.z)
-  x_pred = np.maximum(np.array(model_msg.position.x), 0.0)
+  x = np.array(model_msg.position.x)
+  y = np.array(model_msg.position.y)
 
-  # path curvature (signed) at each predicted timestep
-  k = yaw_rate_pred / np.clip(v_pred, 0.3, 100.0)
+  # geometric curvature of the predicted path: κ = (x' y'' - y' x'') / (x'² + y'²)^(3/2)
+  dx = np.gradient(x)
+  dy = np.gradient(y)
+  ddx = np.gradient(dx)
+  ddy = np.gradient(dy)
+  k = (dx * ddy - dy * ddx) / np.maximum((dx ** 2 + dy ** 2) ** 1.5, 1e-3)
 
   # roll-compensated lat accel budget per step: gravity helps when sign(roll) == sign(k)
-  a_lat_budget = A_LAT_REG_MAX + ACCELERATION_DUE_TO_GRAVITY * roll * np.sign(k)
-  a_lat_budget = np.maximum(a_lat_budget, 0.5)
-
+  a_lat_budget = np.maximum(A_LAT_REG_MAX + ACCELERATION_DUE_TO_GRAVITY * roll * np.sign(k), 0.5)
   v_max = np.sqrt(a_lat_budget / (np.abs(k) + 1e-3))
 
-  # speed required NOW to decelerate to v_max[i] by the time we cover x_pred[i]
-  v_now_required = np.sqrt(v_max ** 2 + 2.0 * A_LONG_DECEL_TARGET * x_pred)
+  # required decel right now to be at v_max[i] when we cover distance x[i]:
+  # v_max² = v_ego² + 2·a·d  →  a = (v_max² - v_ego²) / (2·d)
+  # ignore early indices where x is tiny — np.gradient has boundary effects there
+  d = np.maximum(x, CURVE_MIN_LOOKAHEAD)
+  a_required = (v_max ** 2 - v_ego ** 2) / (2.0 * d)
+  a_required = np.where(x > CURVE_MIN_LOOKAHEAD, a_required, 0.0)
+  a_required = np.minimum(a_required, 0.0)  # only cap accel, never command it
 
-  return float(np.min(v_now_required))
+  return max(float(np.min(a_required)), A_CURVE_MIN_DECEL)
 
 
 class LongitudinalPlanner:
@@ -94,6 +106,7 @@ class LongitudinalPlanner:
 
     self.a_desired = init_a
     self.v_desired_filter = FirstOrderFilter(init_v, 2.0, self.dt)
+    self.curve_a_filter = FirstOrderFilter(0.0, 0.3, self.dt)
     self.prev_accel_clip = [ACCEL_MIN, ACCEL_MAX]
     self.output_a_target = 0.0
     self.output_should_stop = False
@@ -132,9 +145,6 @@ class LongitudinalPlanner:
     v_cruise_kph = min(sm['carState'].vCruise, V_CRUISE_MAX)
     v_cruise = v_cruise_kph * CV.KPH_TO_MS
     v_cruise_initialized = sm['carState'].vCruise != V_CRUISE_UNSET
-
-    v_cruise_curve = limit_v_cruise_in_curves(sm['modelV2'], sm['liveParameters'].roll)
-    v_cruise = min(v_cruise, v_cruise_curve)
 
     long_control_off = sm['controlsState'].longControlState == LongCtrlState.off
     force_slow_decel = sm['controlsState'].forceDecel
@@ -202,6 +212,11 @@ class LongitudinalPlanner:
     else:
       output_a_target = output_a_target_mpc
       self.output_should_stop = output_should_stop_mpc
+
+    output_a_target_curve = self.curve_a_filter.update(limit_accel_in_curves(sm['modelV2'], v_ego, sm['liveParameters'].roll))
+    if output_a_target_curve < 0 and output_a_target_curve < output_a_target:
+      output_a_target = output_a_target_curve
+      self.mpc.source = LongitudinalPlanSource.curve
 
     for idx in range(2):
       accel_clip[idx] = np.clip(accel_clip[idx], self.prev_accel_clip[idx] - 0.05, self.prev_accel_clip[idx] + 0.05)
