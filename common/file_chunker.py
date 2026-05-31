@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import io
 import sys
 import math
 import os
@@ -39,14 +40,40 @@ def get_existing_chunks(path):
     return _chunk_paths(path, num_chunks)
   raise FileNotFoundError(path)
 
-def read_file_chunked(path):
+def _data_chunk_paths(path):
   manifest_path = get_manifest_path(path)
   if os.path.isfile(manifest_path):
     num_chunks = int(Path(manifest_path).read_text().strip())
-    return b''.join(Path(get_chunk_name(path, i, num_chunks)).read_bytes() for i in range(num_chunks))
+    return [get_chunk_name(path, i, num_chunks) for i in range(num_chunks)]
   if os.path.isfile(path):
-    return Path(path).read_bytes()
+    return [path]
   raise FileNotFoundError(path)
+
+def read_file_chunked(path):
+  return b''.join(Path(p).read_bytes() for p in _data_chunk_paths(path))
+
+class _ChunkedReader(io.RawIOBase):
+  # presents the concatenated chunks as one read-only stream so pickle.load can
+  # pull bytes on demand instead of materializing the whole file in RAM first.
+  def __init__(self, paths):
+    self._paths, self._idx = paths, 0
+    self._f = open(self._paths[0], 'rb') if self._paths else None
+  def readable(self): return True
+  def readinto(self, b):
+    while self._f is not None:
+      n = self._f.readinto(b)
+      if n: return n
+      self._f.close()
+      self._idx += 1
+      self._f = open(self._paths[self._idx], 'rb') if self._idx < len(self._paths) else None
+    return 0
+  def close(self):
+    if self._f is not None: self._f.close()
+    self._f = None
+    super().close()
+
+def open_file_chunked(path):
+  return io.BufferedReader(_ChunkedReader(_data_chunk_paths(path)))
 
 
 if __name__ == "__main__":
