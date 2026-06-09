@@ -793,7 +793,7 @@ struct SelfdriveState {
     promptRepeat @7;
     promptDistracted @8;
 
-    laneChange @9;
+    laneChangeConfirmed @9;
   }
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
