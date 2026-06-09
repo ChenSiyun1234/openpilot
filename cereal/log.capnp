@@ -936,7 +936,7 @@ struct ControlsState @0x97ff69c53601abf1 {
     alertStatus @38 :SelfdriveState.AlertStatus;
     alertSize @39 :SelfdriveState.AlertSize;
     alertType @44 :Text;
-    alertSound2 @56 :Car.CarControl.HUDControl.AudibleAlert;
+    alertSound2 @56 :SelfdriveState.AudibleAlert;
     engageable @41 :Bool;  # can OP be engaged?
     state @31 :SelfdriveState.OpenpilotState;
     enabled @19 :Bool;
