@@ -771,7 +771,6 @@ struct SelfdriveState {
   alertStatus @5 :AlertStatus;
   alertSize @6 :AlertSize;
   alertType @7 :Text;
-  alertSoundDEPRECATED @8 :Car.CarControl.HUDControl.AudibleAlert;
   alertSound @13 :AudibleAlert;
   alertHudVisual @12 :Car.CarControl.HUDControl.VisualAlert;
 
@@ -793,7 +792,7 @@ struct SelfdriveState {
     promptRepeat @7;
     promptDistracted @8;
 
-    laneChangeConfirmed @9;
+    confirmation @9;
   }
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
@@ -815,6 +814,10 @@ struct SelfdriveState {
     small @1;
     mid @2;
     full @3;
+  }
+
+  deprecated :group {
+    alertSound @8 :Car.CarControl.HUDControl.AudibleAlert;
   }
 }
 
