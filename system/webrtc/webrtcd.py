@@ -240,7 +240,8 @@ class StreamSession:
   def __init__(self, sdp: str, init_camera: str, incoming_services: list[str], outgoing_services: list[str], debug_mode: bool = False):
     builder = WebRTCAnswerBuilder(sdp)
 
-    self.video_track = LiveStreamVideoStreamTrack(init_camera) if not debug_mode else VideoStreamTrack()
+    self.init_camera = init_camera
+    self.video_track = LiveStreamVideoStreamTrack(self.init_camera) if not debug_mode else VideoStreamTrack()
     builder.add_video_stream(init_camera, self.video_track)
 
     self.stream = builder.stream()
@@ -326,6 +327,7 @@ class StreamSession:
   async def run(self):
     try:
       await self.stream.wait_for_connection()
+      self.video_track.request_livestream_keyframe(self.init_camera)
       if self.stream.has_messaging_channel():
         if self.incoming_bridge is not None:
           await self.shared_pub_master.add_services_if_needed(self.incoming_bridge_services)
@@ -355,6 +357,8 @@ class StreamSession:
         await self.bitrate_controller.stop()
       if self.outgoing_bridge is not None:
         await self.outgoing_bridge.stop()
+      if self.video_track is not None:
+        self.video_track.stop()
       await self.stream.stop()
 
 
@@ -381,7 +385,7 @@ async def get_stream(request: 'web.Request'):
         except Exception:
           pass
       await s.stop()
-      del stream_dict[sid]
+      stream_dict.pop(sid, None)
 
     session = StreamSession(body.sdp, body.initCamera, body.bridge_services_in, body.bridge_services_out, debug_mode)
     try:
@@ -395,9 +399,14 @@ async def get_stream(request: 'web.Request'):
     except Exception:
       await session.stop()
       raise
+    stream_dict[session.identifier] = session
     session.start()
 
-    stream_dict[session.identifier] = session
+    session_id = session.identifier
+
+    def remove_finished_session(_: asyncio.Task) -> None:
+      stream_dict.pop(session_id, None)
+    session.run_task.add_done_callback(remove_finished_session)
 
   return web.json_response({"sdp": answer.sdp, "type": answer.type, "session_id": session.identifier})
 
@@ -405,6 +414,8 @@ async def get_stream(request: 'web.Request'):
 async def post_candidate(request: 'web.Request'):
   body = await request.json()
   session = request.app.get('streams', {}).get(body.get("session_id"))
+  if session is None:
+    return web.Response(status=200, text="OK")
 
   try:
     await session.add_ice_candidate(body.get("candidate"))
@@ -437,6 +448,26 @@ async def post_notify(request: 'web.Request'):
   return web.Response(status=200, text="OK")
 
 
+# async def on_startup(app: 'web.Application'):
+#   logger = logging.getLogger("webrtcd")
+#   start_time = time.monotonic()
+#   pc = None
+
+#   try:
+#     RTCRtpSender.getCapabilities("video")
+#     pc = RTCPeerConnection(RTCConfiguration(bundlePolicy=RTCBundlePolicy.MAX_BUNDLE))
+#     pc.addTransceiver("video", direction="recvonly")
+#     pc.createDataChannel("data", ordered=True)
+#     offer = await pc.createOffer()
+#     await asyncio.wait_for(pc.setLocalDescription(offer), timeout=1.5)
+#     logger.info("Warmed WebRTC stack in %.1f ms", (time.monotonic() - start_time) * 1000)
+#   except Exception:
+#     logger.exception("WebRTC stack warmup failed")
+#   finally:
+#     if pc is not None:
+#       await pc.close()
+
+
 async def on_shutdown(app: 'web.Application'):
   for session in app['streams'].values():
     await session.stop()
@@ -454,6 +485,7 @@ def webrtcd_thread(host: str, port: int, debug: bool):
   app['streams'] = dict()
   app['stream_lock'] = asyncio.Lock()
   app['debug'] = debug
+  # app.on_startup.append(on_startup)
   app.on_shutdown.append(on_shutdown)
   app.router.add_post("/stream", get_stream)
   app.router.add_post("/candidate", post_candidate)

@@ -38,8 +38,6 @@ class LiveStreamVideoStreamTrack(TiciVideoStreamTrack):
     self._t0_ns = time.monotonic_ns()
     self.timing_sei_enabled = False
 
-    self.request_livestream_keyframe(camera_type)
-
   def _make_sock(self, camera_type: str) -> messaging.SubSocket:
     return messaging.sub_sock(self.camera_to_sock_mapping[camera_type], conflate=True)
 
