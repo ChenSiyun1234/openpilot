@@ -98,6 +98,7 @@ class DeveloperLayout(Widget):
     self._on_enable_ui_debug(self._params.get_bool("ShowDebugInfo"))
 
     self._scroller = Scroller([
+      self._dual_tone_toggle,
       self._adb_toggle,
       self._ssh_toggle,
       self._ssh_keys,
@@ -106,7 +107,6 @@ class DeveloperLayout(Widget):
       self._lat_maneuver_toggle,
       self._alpha_long_toggle,
       self._ui_debug_toggle,
-      self._dual_tone_toggle,
     ], line_separator=True, spacing=0)
 
     # Toggles should be not available to change in onroad state

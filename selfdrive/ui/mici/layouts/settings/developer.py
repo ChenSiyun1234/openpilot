@@ -88,6 +88,7 @@ class DeveloperLayoutMici(NavScroller):
                                                                                gui_app.set_show_fps(checked)))
 
     self._scroller.add_widgets([
+      self._dual_tone_toggle,
       self._adb_toggle,
       self._ssh_toggle,
       self._ssh_keys_btn,
@@ -96,7 +97,6 @@ class DeveloperLayoutMici(NavScroller):
       self._lat_maneuver_toggle,
       self._alpha_long_toggle,
       self._debug_mode_toggle,
-      self._dual_tone_toggle,
     ])
 
     # Toggle lists
