@@ -7,6 +7,7 @@ import wave
 from cereal import log, messaging
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.filter_simple import FirstOrderFilter
+from openpilot.common.params import Params
 from openpilot.common.realtime import Ratekeeper
 from openpilot.common.utils import retry
 from openpilot.common.swaglog import cloudlog
@@ -31,6 +32,8 @@ if HARDWARE.get_device_type() == "tizi":
   VOLUME_BASE = 10
 
 AudibleAlert = log.SelfdriveState.AudibleAlert
+
+DUAL_TONE_SOUNDS = {"engage.wav": "dual_engage.wav", "disengage.wav": "dual_disengage.wav"}
 
 
 sound_list: dict[int, tuple[str, int | None, float]] = {
@@ -67,6 +70,8 @@ def check_selfdrive_timeout_alert(sm):
 
 class Soundd:
   def __init__(self):
+    self.params = Params()
+    self.dual_tone_sounds = self.params.get_bool("DualToneSounds")
     self.load_sounds()
 
     self.current_alert = AudibleAlert.none
@@ -82,11 +87,13 @@ class Soundd:
     self.spl_filter_weighted = FirstOrderFilter(0, 2.5, FILTER_DT, initialized=False)
 
   def load_sounds(self):
-    self.loaded_sounds: dict[int, np.ndarray] = {}
+    loaded_sounds: dict[int, np.ndarray] = {}
 
     # Load all sounds
     for sound in sound_list:
       filename, play_count, volume = sound_list[sound]
+      if self.dual_tone_sounds:
+        filename = DUAL_TONE_SOUNDS.get(filename, filename)
 
       with wave.open(BASEDIR + "/selfdrive/assets/sounds/" + filename, 'r') as wavefile:
         assert wavefile.getnchannels() == 1
@@ -94,7 +101,10 @@ class Soundd:
         assert wavefile.getframerate() == SAMPLE_RATE
 
         length = wavefile.getnframes()
-        self.loaded_sounds[sound] = np.frombuffer(wavefile.readframes(length), dtype=np.int16).astype(np.float32) / (2**16/2)
+        loaded_sounds[sound] = np.frombuffer(wavefile.readframes(length), dtype=np.int16).astype(np.float32) / (2**16/2)
+
+    # swap atomically: the audio callback reads this dict from another thread
+    self.loaded_sounds = loaded_sounds
 
   def get_sound_data(self, frames): # get "frames" worth of data from the current alert sound, looping when required
 
@@ -184,6 +194,13 @@ class Soundd:
             self.current_volume = self.calculate_volume(float(self.spl_filter_weighted.x))
 
         self.get_audible_alert(sm)
+
+        # check once per second if the sound set changed
+        if rk.frame % 20 == 0:
+          dual_tone_sounds = self.params.get_bool("DualToneSounds")
+          if dual_tone_sounds != self.dual_tone_sounds:
+            self.dual_tone_sounds = dual_tone_sounds
+            self.load_sounds()
 
         # Ramp up immediate warning sound over 4s
         if self.current_alert == AudibleAlert.warningImmediate:

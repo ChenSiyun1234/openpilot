@@ -88,6 +88,13 @@ class DeveloperLayout(Widget):
       initial_state=self._params.get_bool("ShowDebugInfo"),
       callback=self._on_enable_ui_debug,
     )
+
+    self._dual_tone_toggle = toggle_item(
+      lambda: tr("Dual Tone Sounds"),
+      description="",
+      initial_state=self._params.get_bool("DualToneSounds"),
+      callback=self._on_dual_tone_sounds,
+    )
     self._on_enable_ui_debug(self._params.get_bool("ShowDebugInfo"))
 
     self._scroller = Scroller([
@@ -99,6 +106,7 @@ class DeveloperLayout(Widget):
       self._lat_maneuver_toggle,
       self._alpha_long_toggle,
       self._ui_debug_toggle,
+      self._dual_tone_toggle,
     ], line_separator=True, spacing=0)
 
     # Toggles should be not available to change in onroad state
@@ -146,8 +154,12 @@ class DeveloperLayout(Widget):
       ("LateralManeuverMode", self._lat_maneuver_toggle),
       ("AlphaLongitudinalEnabled", self._alpha_long_toggle),
       ("ShowDebugInfo", self._ui_debug_toggle),
+      ("DualToneSounds", self._dual_tone_toggle),
     ):
       item.action_item.set_state(self._params.get_bool(key))
+
+  def _on_dual_tone_sounds(self, state: bool):
+    self._params.put_bool("DualToneSounds", state, block=True)
 
   def _on_enable_ui_debug(self, state: bool):
     self._params.put_bool("ShowDebugInfo", state, block=True)
