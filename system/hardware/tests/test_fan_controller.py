@@ -9,42 +9,42 @@ def patched_controller(mocker, controller_class):
   return controller_class(2)
 
 class TestFanController:
-  def wind_up(self, controller, ignition=True):
+  def wind_up(self, controller, power_save=False):
     for _ in range(1000):
-      controller.update(100, ignition)
+      controller.update(100, power_save)
 
-  def wind_down(self, controller, ignition=False):
+  def wind_down(self, controller, power_save=True):
     for _ in range(1000):
-      controller.update(10, ignition)
+      controller.update(10, power_save)
 
   @pytest.mark.parametrize("controller_class", ALL_CONTROLLERS)
   def test_hot_onroad(self, mocker, controller_class):
     controller = patched_controller(mocker, controller_class)
     self.wind_up(controller)
-    assert controller.update(100, True) >= 70
+    assert controller.update(100, False) >= 70
 
   @pytest.mark.parametrize("controller_class", ALL_CONTROLLERS)
   def test_offroad_limits(self, mocker, controller_class):
     controller = patched_controller(mocker, controller_class)
     self.wind_up(controller)
-    assert controller.update(100, False) <= 30
+    assert controller.update(100, True) <= 30
 
   @pytest.mark.parametrize("controller_class", ALL_CONTROLLERS)
   def test_no_fan_wear(self, mocker, controller_class):
     controller = patched_controller(mocker, controller_class)
     self.wind_down(controller)
-    assert controller.update(10, False) == 0
+    assert controller.update(10, True) == 0
 
   @pytest.mark.parametrize("controller_class", ALL_CONTROLLERS)
   def test_limited(self, mocker, controller_class):
     controller = patched_controller(mocker, controller_class)
-    self.wind_up(controller, True)
-    assert controller.update(100, True) == 100
+    self.wind_up(controller, False)
+    assert controller.update(100, False) == 100
 
   @pytest.mark.parametrize("controller_class", ALL_CONTROLLERS)
   def test_windup_speed(self, mocker, controller_class):
     controller = patched_controller(mocker, controller_class)
-    self.wind_down(controller, True)
+    self.wind_down(controller, False)
     for _ in range(10):
-      controller.update(90, True)
-    assert controller.update(90, True) >= 60
+      controller.update(90, False)
+    assert controller.update(90, False) >= 60
