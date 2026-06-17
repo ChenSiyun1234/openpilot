@@ -718,6 +718,12 @@ struct UsbState {
   # VBUS brownout
   vbusMv @21 :UInt32;                    # VBUS millivolts
 
+  # bulk-transfer fault visibility (from tinygrad retry via /dev/shm/usbgpu_bulk_stats)
+  bulkErrorCount @22 :UInt32;            # transient bulk transfer errors hitting modeld
+  bulkRecoveredCount @23 :UInt32;        # transactions the retry saved (would crash/lag modeld without it)
+  bulkFatalCount @24 :UInt32;            # retries exhausted -> modeld crash (link-level, retry can't save)
+  bulkNoDeviceCount @25 :UInt32;         # errors that were "No such device" (hard disconnect / re-enum)
+
   enum LtssmState {
     unknown @0;
     u0 @1;
