@@ -68,18 +68,18 @@ const std::filesystem::path &repo_root() {
 }
 
 ImU32 timeline_entry_color(TimelineEntry::Type type, float alpha) {
-  return timeline_entry_color(type, alpha, {111, 143, 175});
+  return timeline_entry_color(type, alpha, theme::neutral);
 }
 
 ImU32 timeline_entry_color(TimelineEntry::Type type, float alpha, std::array<uint8_t, 3> none_color) {
   switch (type) {
     case TimelineEntry::Type::Engaged:
-      return ImGui::GetColorU32(color_rgb(0, 163, 108, alpha));
+      return ImGui::GetColorU32(color_rgb(theme::engaged, alpha));
     case TimelineEntry::Type::AlertInfo:
-      return ImGui::GetColorU32(color_rgb(255, 195, 0, alpha));
+      return ImGui::GetColorU32(color_rgb(theme::alert_info, alpha));
     case TimelineEntry::Type::AlertWarning:
     case TimelineEntry::Type::AlertCritical:
-      return ImGui::GetColorU32(color_rgb(199, 0, 57, alpha));
+      return ImGui::GetColorU32(color_rgb(theme::alert_crit, alpha));
     case TimelineEntry::Type::None:
     default:
       return ImGui::GetColorU32(color_rgb(none_color, alpha));

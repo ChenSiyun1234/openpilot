@@ -13,17 +13,6 @@
 #include <string_view>
 #include <vector>
 
-inline ImVec4 color_rgb(int r, int g, int b, float alpha = 1.0f) {
-  return ImVec4(static_cast<float>(r) / 255.0f,
-                static_cast<float>(g) / 255.0f,
-                static_cast<float>(b) / 255.0f,
-                alpha);
-}
-
-inline ImVec4 color_rgb(const std::array<uint8_t, 3> &color, float alpha = 1.0f) {
-  return color_rgb(color[0], color[1], color[2], alpha);
-}
-
 inline std::string lowercase_copy(std::string_view value) {
   std::string out(value);
   std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {

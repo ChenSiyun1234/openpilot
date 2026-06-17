@@ -100,18 +100,8 @@ bool curves_are_bool_like(const std::vector<PreparedCurve> &prepared_curves) {
 }
 
 ImU32 state_block_color(int value, float alpha = 1.0f) {
-  static constexpr std::array<std::array<uint8_t, 3>, 8> kPalette = {{
-    {{111, 143, 175}},
-    {{0, 163, 108}},
-    {{255, 195, 0}},
-    {{199, 0, 57}},
-    {{123, 97, 255}},
-    {{0, 150, 136}},
-    {{214, 48, 49}},
-    {{52, 73, 94}},
-  }};
-  const size_t index = static_cast<size_t>(std::abs(value)) % kPalette.size();
-  return ImGui::GetColorU32(color_rgb(kPalette[index], alpha));
+  const size_t index = static_cast<size_t>(std::abs(value)) % theme::state_palette.size();
+  return ImGui::GetColorU32(color_rgb(theme::state_palette[index], alpha));
 }
 
 std::string state_block_label(const PreparedCurve &curve, int value) {
@@ -431,8 +421,8 @@ bool draw_pane_close_button_overlay() {
   ImDrawList *draw_list = ImGui::GetWindowDrawList();
   const float pad = 11.0f;
   const ImU32 color = hovered || held
-    ? ImGui::GetColorU32(color_rgb(72, 79, 88))
-    : ImGui::GetColorU32(color_rgb(138, 146, 156));
+    ? ImGui::GetColorU32(color_rgb(theme::icon_strong))
+    : ImGui::GetColorU32(color_rgb(theme::text_faint));
   draw_list->AddLine(ImVec2(rect.Min.x + pad, rect.Min.y + pad),
                      ImVec2(rect.Max.x - pad, rect.Max.y - pad),
                      color,
@@ -452,7 +442,7 @@ void draw_pane_frame_overlay() {
                           ImVec2(window_pos.x + content_max.x, window_pos.y + content_max.y));
   ImGui::GetWindowDrawList()->AddRect(frame_rect.Min,
                                       frame_rect.Max,
-                                      ImGui::GetColorU32(color_rgb(186, 190, 196)),
+                                      ImGui::GetColorU32(color_rgb(theme::border)),
                                       0.0f,
                                       0,
                                       1.0f);
@@ -539,14 +529,14 @@ void draw_state_blocks_pane(const std::vector<PreparedCurve> &prepared_curves, U
 
     if (curve_index > 0) {
       draw_list->AddLine(ImVec2(plot_min.x, y0), ImVec2(plot_min.x + plot_size.x, y0),
-                         IM_COL32(210, 214, 220, 255), 1.0f);
+                         color_u32(theme::grid_line), 1.0f);
     }
     if (curve_count > 1) {
       draw_list->AddLine(ImVec2(blocks_min_x, y0), ImVec2(blocks_min_x, y1),
-                         IM_COL32(210, 214, 220, 255), 1.0f);
+                         color_u32(theme::grid_line), 1.0f);
       const float label_left = plot_min.x + 6.0f;
       const float label_right = std::max(label_left + 12.0f, blocks_min_x - 6.0f);
-      ImGui::PushStyleColor(ImGuiCol_Text, color_rgb(120, 128, 138));
+      ImGui::PushStyleColor(ImGuiCol_Text, color_rgb(theme::crosshair));
       ImGui::RenderTextEllipsis(draw_list,
                                 ImVec2(label_left, y0 + 4.0f),
                                 ImVec2(label_right, y1 - 4.0f),
@@ -777,20 +767,20 @@ void draw_plot(const AppSession &session, Pane *pane, UiState *state) {
   const bool has_cursor_time = state->has_tracker_time;
   const double cursor_time = state->tracker_time;
 
-  ImPlot::PushStyleColor(ImPlotCol_PlotBg, color_rgb(255, 255, 255));
-  ImPlot::PushStyleColor(ImPlotCol_PlotBorder, color_rgb(186, 190, 196));
-  ImPlot::PushStyleColor(ImPlotCol_LegendBg, color_rgb(248, 249, 251, 0.92f));
-  ImPlot::PushStyleColor(ImPlotCol_LegendBorder, color_rgb(168, 175, 184));
-  ImPlot::PushStyleColor(ImPlotCol_LegendText, color_rgb(57, 62, 69));
-  ImPlot::PushStyleColor(ImPlotCol_TitleText, color_rgb(57, 62, 69));
-  ImPlot::PushStyleColor(ImPlotCol_InlayText, color_rgb(95, 103, 112));
-  ImPlot::PushStyleColor(ImPlotCol_AxisGrid, color_rgb(188, 196, 206));
-  ImPlot::PushStyleColor(ImPlotCol_AxisText, color_rgb(95, 103, 112));
-  ImPlot::PushStyleColor(ImPlotCol_AxisBg, color_rgb(255, 255, 255, 0.0f));
-  ImPlot::PushStyleColor(ImPlotCol_AxisBgHovered, color_rgb(214, 220, 228, 0.45f));
-  ImPlot::PushStyleColor(ImPlotCol_AxisBgActive, color_rgb(199, 209, 222, 0.55f));
-  ImPlot::PushStyleColor(ImPlotCol_Selection, color_rgb(252, 211, 77, 0.28f));
-  ImPlot::PushStyleColor(ImPlotCol_Crosshairs, color_rgb(120, 128, 138, 0.70f));
+  ImPlot::PushStyleColor(ImPlotCol_PlotBg, color_rgb(theme::white));
+  ImPlot::PushStyleColor(ImPlotCol_PlotBorder, color_rgb(theme::border));
+  ImPlot::PushStyleColor(ImPlotCol_LegendBg, color_rgb(theme::popup_bg, 0.92f));
+  ImPlot::PushStyleColor(ImPlotCol_LegendBorder, color_rgb(theme::legend_border));
+  ImPlot::PushStyleColor(ImPlotCol_LegendText, color_rgb(theme::heading));
+  ImPlot::PushStyleColor(ImPlotCol_TitleText, color_rgb(theme::heading));
+  ImPlot::PushStyleColor(ImPlotCol_InlayText, color_rgb(theme::axis_text));
+  ImPlot::PushStyleColor(ImPlotCol_AxisGrid, color_rgb(theme::axis_grid));
+  ImPlot::PushStyleColor(ImPlotCol_AxisText, color_rgb(theme::axis_text));
+  ImPlot::PushStyleColor(ImPlotCol_AxisBg, color_rgb(theme::white, 0.0f));
+  ImPlot::PushStyleColor(ImPlotCol_AxisBgHovered, color_rgb(theme::axis_bg_hi, 0.45f));
+  ImPlot::PushStyleColor(ImPlotCol_AxisBgActive, color_rgb(theme::axis_bg_active, 0.55f));
+  ImPlot::PushStyleColor(ImPlotCol_Selection, color_rgb(theme::selection, 0.28f));
+  ImPlot::PushStyleColor(ImPlotCol_Crosshairs, color_rgb(theme::crosshair, 0.70f));
   ImPlot::PushStyleVar(ImPlotStyleVar_LegendPadding, ImVec2(56.0f, 10.0f));
 
   ImPlotFlags plot_flags = ImPlotFlags_NoTitle | ImPlotFlags_NoMenus;
@@ -864,7 +854,7 @@ void draw_plot(const AppSession &session, Pane *pane, UiState *state) {
     if (has_cursor_time) {
       const double clamped_cursor_time = std::clamp(cursor_time, state->route_x_min, state->route_x_max);
       ImPlotSpec cursor_spec;
-      cursor_spec.LineColor = color_rgb(108, 118, 128, 0.7f);
+      cursor_spec.LineColor = color_rgb(theme::text_disabled, 0.7f);
       cursor_spec.LineWeight = 1.0f;
       cursor_spec.Flags = ImPlotItemFlags_NoLegend;
       ImPlot::PlotInfLines("##tracker_cursor", &clamped_cursor_time, 1, cursor_spec);

@@ -3,6 +3,7 @@
 #include "cereal/gen/cpp/log.capnp.h"
 #include "imgui.h"
 #include "tools/jotpluggler/dbc.h"
+#include "tools/jotpluggler/theme.h"
 #include "tools/jotpluggler/util.h"
 
 #include <algorithm>

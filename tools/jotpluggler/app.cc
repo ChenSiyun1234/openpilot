@@ -295,27 +295,8 @@ void configure_style() {
   style.FramePadding = ImVec2(6.0f, 3.0f);
   style.ItemSpacing = ImVec2(8.0f, 5.0f);
   style.ItemInnerSpacing = ImVec2(6.0f, 3.0f);
-  struct ColorDef { ImGuiCol idx; int r, g, b; };
-  constexpr ColorDef COLORS[] = {
-    {ImGuiCol_WindowBg, 250, 250, 251},  {ImGuiCol_ChildBg, 255, 255, 255},
-    {ImGuiCol_Border, 194, 198, 204},    {ImGuiCol_TitleBg, 252, 252, 253},
-    {ImGuiCol_TitleBgActive, 252, 252, 253}, {ImGuiCol_TitleBgCollapsed, 252, 252, 253},
-    {ImGuiCol_Text, 74, 80, 88},         {ImGuiCol_TextDisabled, 108, 118, 128},
-    {ImGuiCol_Button, 255, 255, 255},    {ImGuiCol_ButtonHovered, 246, 248, 250},
-    {ImGuiCol_ButtonActive, 238, 240, 244}, {ImGuiCol_FrameBg, 255, 255, 255},
-    {ImGuiCol_FrameBgHovered, 248, 249, 251}, {ImGuiCol_FrameBgActive, 241, 244, 248},
-    {ImGuiCol_Header, 243, 245, 248},    {ImGuiCol_HeaderHovered, 237, 240, 244},
-    {ImGuiCol_HeaderActive, 232, 236, 240}, {ImGuiCol_PopupBg, 248, 249, 251},
-    {ImGuiCol_MenuBarBg, 232, 236, 241}, {ImGuiCol_Separator, 194, 198, 204},
-    {ImGuiCol_ScrollbarBg, 240, 242, 245}, {ImGuiCol_ScrollbarGrab, 202, 207, 214},
-    {ImGuiCol_ScrollbarGrabHovered, 180, 186, 194}, {ImGuiCol_ScrollbarGrabActive, 164, 171, 180},
-    {ImGuiCol_Tab, 219, 224, 230},       {ImGuiCol_TabHovered, 232, 236, 241},
-    {ImGuiCol_TabSelected, 250, 251, 253}, {ImGuiCol_TabSelectedOverline, 92, 109, 136},
-    {ImGuiCol_TabDimmed, 213, 219, 226}, {ImGuiCol_TabDimmedSelected, 244, 247, 249},
-    {ImGuiCol_TabDimmedSelectedOverline, 92, 109, 136}, {ImGuiCol_DockingEmptyBg, 244, 246, 248},
-  };
-  for (const auto &c : COLORS) { style.Colors[c.idx] = color_rgb(c.r, c.g, c.b); }
-  style.Colors[ImGuiCol_DockingPreview] = color_rgb(69, 115, 184, 0.22f);
+  for (const auto &c : theme::imgui_colors) { style.Colors[c.idx] = color_rgb(c.r, c.g, c.b); }
+  style.Colors[ImGuiCol_DockingPreview] = color_rgb(theme::docking_preview, 0.22f);
 
   ImPlotStyle &plot_style = ImPlot::GetStyle();
   plot_style.PlotBorderSize = 1.0f;
@@ -725,26 +706,14 @@ void draw_browser_special_item(const char *item_id, const char *label) {
 }
 
 std::array<uint8_t, 3> app_next_curve_color(const Pane &pane) {
-  static constexpr std::array<std::array<uint8_t, 3>, 10> PALETTE = {{
-    {35, 107, 180},
-    {220, 82, 52},
-    {67, 160, 71},
-    {243, 156, 18},
-    {123, 97, 255},
-    {0, 150, 136},
-    {214, 48, 49},
-    {52, 73, 94},
-    {197, 90, 17},
-    {96, 125, 139},
-  }};
-  return PALETTE[pane.curves.size() % PALETTE.size()];
+  return theme::curve_palette[pane.curves.size() % theme::curve_palette.size()];
 }
 
 void draw_sidebar(AppSession *session, const UiMetrics &ui, UiState *state, bool show_camera_feed) {
   ImGui::SetNextWindowPos(ImVec2(0.0f, ui.top_offset));
   ImGui::SetNextWindowSize(ImVec2(ui.sidebar_width, std::max(1.0f, ui.height - ui.top_offset)));
-  ImGui::PushStyleColor(ImGuiCol_WindowBg, color_rgb(238, 240, 244));
-  ImGui::PushStyleColor(ImGuiCol_Border, color_rgb(190, 197, 205));
+  ImGui::PushStyleColor(ImGuiCol_WindowBg, color_rgb(theme::pane_bg));
+  ImGui::PushStyleColor(ImGuiCol_Border, color_rgb(theme::popup_border));
   const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
                                  ImGuiWindowFlags_NoMove |
                                  ImGuiWindowFlags_NoResize |
@@ -767,7 +736,7 @@ void draw_sidebar(AppSession *session, const UiMetrics &ui, UiState *state, bool
       const StreamPollSnapshot stream = session->stream_poller ? session->stream_poller->snapshot() : StreamPollSnapshot{};
       const bool paused = stream.paused || session->stream_paused;
       const bool live = stream.connected && !paused;
-      const ImVec4 status_color = live ? color_rgb(38, 135, 67) : (paused ? color_rgb(168, 119, 34) : color_rgb(155, 63, 63));
+      const ImVec4 status_color = live ? color_rgb(theme::live) : (paused ? color_rgb(theme::paused) : color_rgb(theme::error));
       ImGui::TextColored(status_color, "%s %s", live ? "●" : "○", stream.source_label.c_str());
       ImGui::TextDisabled("%s%s", stream_source_kind_label(stream.source_kind), paused ? "  paused" : "");
       const double span = session->route_data.has_time_range ? (session->route_data.x_max - session->route_data.x_min) : 0.0;
@@ -1230,8 +1199,8 @@ std::optional<PaneDropAction> draw_pane_drop_target(int tab_index, int pane_inde
       auto try_accept = [&](const char *type) -> const ImGuiPayload * {
         const ImGuiPayload *p = ImGui::AcceptDragDropPayload(type, ImGuiDragDropFlags_AcceptBeforeDelivery);
         if (p && p->Preview) {
-          draw_list->AddRectFilled(zone.rect.Min, zone.rect.Max, IM_COL32(70, 130, 220, 55));
-          draw_list->AddRect(zone.rect.Min, zone.rect.Max, IM_COL32(45, 95, 175, 220), 0.0f, 0, 2.0f);
+          draw_list->AddRectFilled(zone.rect.Min, zone.rect.Max, color_u32(theme::drop_zone_fill, 55));
+          draw_list->AddRect(zone.rect.Min, zone.rect.Max, color_u32(theme::drop_zone_border, 220), 0.0f, 0, 2.0f);
         }
         return p;
       };
@@ -1550,11 +1519,11 @@ void draw_pane_windows(AppSession *session, UiState *state) {
     std::optional<PaneDropAction> drop_action;
     bool close_pane_requested = false;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(2.0f, 2.0f));
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, color_rgb(250, 250, 251));
-    ImGui::PushStyleColor(ImGuiCol_Border, color_rgb(194, 198, 204));
-    ImGui::PushStyleColor(ImGuiCol_TitleBg, color_rgb(252, 252, 253));
-    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, color_rgb(252, 252, 253));
-    ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, color_rgb(252, 252, 253));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, color_rgb(theme::window_bg));
+    ImGui::PushStyleColor(ImGuiCol_Border, color_rgb(theme::border_strong));
+    ImGui::PushStyleColor(ImGuiCol_TitleBg, color_rgb(theme::titlebar_bg));
+    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, color_rgb(theme::titlebar_bg));
+    ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, color_rgb(theme::titlebar_bg));
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
     const std::string window_name = pane_window_name(tab_state->runtime_id, static_cast<int>(i), pane);
     const bool opened = ImGui::Begin(window_name.c_str(), nullptr, flags);
@@ -1612,8 +1581,8 @@ void draw_workspace(AppSession *session, const UiMetrics &ui, UiState *state) {
   ImGui::SetNextWindowPos(ImVec2(ui.content_x, ui.content_y));
   ImGui::SetNextWindowSize(ImVec2(ui.content_w, ui.content_h));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-  ImGui::PushStyleColor(ImGuiCol_WindowBg, color_rgb(244, 246, 248));
-  ImGui::PushStyleColor(ImGuiCol_Border, color_rgb(186, 191, 198));
+  ImGui::PushStyleColor(ImGuiCol_WindowBg, color_rgb(theme::dialog_bg));
+  ImGui::PushStyleColor(ImGuiCol_Border, color_rgb(theme::dialog_border));
   const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
                                  ImGuiWindowFlags_NoMove |
                                  ImGuiWindowFlags_NoResize |
@@ -1720,16 +1689,16 @@ void draw_workspace(AppSession *session, const UiMetrics &ui, UiState *state) {
         }
       }
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12.0f, 5.0f));
-      ImGui::PushStyleColor(ImGuiCol_Tab, color_rgb(210, 217, 225));
-      ImGui::PushStyleColor(ImGuiCol_TabHovered, color_rgb(224, 230, 237));
-      ImGui::PushStyleColor(ImGuiCol_TabSelected, color_rgb(242, 245, 248));
+      ImGui::PushStyleColor(ImGuiCol_Tab, color_rgb(theme::tab_idle));
+      ImGui::PushStyleColor(ImGuiCol_TabHovered, color_rgb(theme::tab_hovered));
+      ImGui::PushStyleColor(ImGuiCol_TabSelected, color_rgb(theme::tab_selected));
       if (ImGui::TabItemButton("   ##new_tab_button", ImGuiTabItemFlags_Trailing)) {
         pending_action = TabActionKind::New;
       }
       {
         const ImRect rect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
         ImDrawList *draw_list = ImGui::GetWindowDrawList();
-        const ImU32 color = ImGui::GetColorU32(color_rgb(72, 79, 88));
+        const ImU32 color = ImGui::GetColorU32(color_rgb(theme::icon_strong));
         const ImVec2 center((rect.Min.x + rect.Max.x) * 0.5f, (rect.Min.y + rect.Max.y) * 0.5f);
         constexpr float half_extent = 6.25f;
         constexpr float thickness = 2.0f;

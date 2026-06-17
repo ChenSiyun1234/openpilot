@@ -389,7 +389,7 @@ void draw_car_marker(ImDrawList *draw_list, ImVec2 center, float bearing_deg, Im
   const ImVec2 left(base.x + perp.x * size * 0.6f, base.y + perp.y * size * 0.6f);
   const ImVec2 right(base.x - perp.x * size * 0.6f, base.y - perp.y * size * 0.6f);
   draw_list->AddTriangleFilled(tip, left, right, color);
-  draw_list->AddTriangle(tip, left, right, IM_COL32(255, 255, 255, 210), 2.0f);
+  draw_list->AddTriangle(tip, left, right, color_u32(theme::white, 210), 2.0f);
 }
 
 bool is_convex_ring(const std::vector<ImVec2> &points) {
@@ -822,11 +822,11 @@ struct RoadPaint {
   float fill_width = 1.0f;
 };
 
-constexpr ImU32 MAP_BG_COLOR = IM_COL32(244, 243, 238, 255);
-constexpr ImU32 MAP_WATER_FILL = IM_COL32(193, 216, 235, 185);
-constexpr ImU32 MAP_WATER_OUTLINE = IM_COL32(143, 173, 201, 220);
-constexpr ImU32 MAP_WATER_LINE = IM_COL32(156, 186, 214, 205);
-constexpr ImU32 MAP_ROUTE_HALO = IM_COL32(31, 40, 50, 92);
+constexpr ImU32 MAP_BG_COLOR = color_u32(theme::map_bg);
+constexpr ImU32 MAP_WATER_FILL = color_u32(theme::map_water_fill, 185);
+constexpr ImU32 MAP_WATER_OUTLINE = color_u32(theme::map_water_outline, 220);
+constexpr ImU32 MAP_WATER_LINE = color_u32(theme::map_water_line, 205);
+constexpr ImU32 MAP_ROUTE_HALO = color_u32(theme::map_route_halo, 92);
 
 RoadPaint road_paint(RoadClass road_class, float zoom) {
   const float scale = std::clamp(0.88f + 0.12f * (zoom - 12.0f), 0.76f, 1.95f);
@@ -978,7 +978,7 @@ void draw_edge_fade(ImDrawList *draw_list,
   const float fade_x = std::max(28.0f, (rect_max.x - rect_min.x) * MAP_EDGE_FADE_FRAC);
   const float fade_y = std::max(28.0f, (rect_max.y - rect_min.y) * MAP_EDGE_FADE_FRAC);
   const ImU32 solid = MAP_BG_COLOR;
-  const ImU32 clear = IM_COL32(244, 243, 238, 6);
+  const ImU32 clear = color_u32(theme::map_bg, 6);
 
   if (west_x > rect_min.x) {
     const float x0 = rect_min.x;
@@ -1156,7 +1156,7 @@ void draw_map_pane(AppSession *session, UiState *state, Pane *, int pane_index) 
     const ImVec2 text = ImGui::CalcTextSize(label);
     draw_list->AddText(ImVec2(rect_min.x + (rect_width - text.x) * 0.5f,
                               rect_min.y + (rect_height - text.y) * 0.5f),
-                       IM_COL32(110, 118, 128, 255), label);
+                       color_u32(theme::map_node_label), label);
     draw_list->PopClipRect();
     return;
   }
@@ -1251,8 +1251,8 @@ void draw_map_pane(AppSession *session, UiState *state, Pane *, int pane_index) 
     const ImVec2 pos(rect_min.x + 12.0f, rect_max.y - text.y - 12.0f);
     draw_list->AddRectFilled(ImVec2(pos.x - 6.0f, pos.y - 4.0f),
                              ImVec2(pos.x + text.x + 6.0f, pos.y + text.y + 4.0f),
-                             IM_COL32(255, 255, 255, 180), 4.0f);
-    draw_list->AddText(pos, IM_COL32(84, 93, 105, 255), label);
+                             color_u32(theme::white, 180), 4.0f);
+    draw_list->AddText(pos, color_u32(theme::map_place_label), label);
   }
   draw_list->PopClipRect();
 
