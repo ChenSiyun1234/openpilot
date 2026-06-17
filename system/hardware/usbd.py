@@ -149,7 +149,7 @@ def main():
       # SI counters
       if ctrl_sysfs is not None:
         s.linkErrorCount = read_int(os.path.join(ctrl_sysfs, "link_error_count"))
-        s.ssResetCount = read_int(os.path.join(ctrl_sysfs, "ss_reset_count"))
+      s.ssResetCount = counts["ssInactiveCount"]
 
       # sleep / power states
       s.runtimeSuspendedMs = read_int(os.path.join(DEVICE, "power/runtime_suspended_time"))
