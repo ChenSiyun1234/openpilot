@@ -59,23 +59,16 @@ def over_current_count() -> int:
 
 
 def find_controller() -> tuple[str | None, str | None]:
-  """Resolve the dwc3-msm glue device that exposes host-mode SS telemetry.
-
-  The dwc3 debugfs link_state reads DWC3_DSTS (peripheral link state), which is
-  meaningless in host mode (the eGPU case). The glue driver instead publishes a
-  host-mode link_state (xHCI PORTSC PLS) and link_error_count (PORTLI) sysfs
-  attrs, so read both from there.
-  """
-  ctrl_sysfs = None
-  m = re.search(r"([0-9a-f]+\.ssusb)", os.path.realpath(DEVICE))
+  """Resolve the dwc3 controller behind DEVICE"""
+  ctrl = None
+  m = re.search(r"([0-9a-f]+\.dwc3)", os.path.realpath(DEVICE))
   if m:
-    ctrl_sysfs = f"/sys/bus/platform/devices/{m.group(1)}"
-  link_state = os.path.join(ctrl_sysfs, "link_state") if ctrl_sysfs else None
+    ctrl = m.group(1)
+  link_state = f"/sys/kernel/debug/{ctrl}/link_state" if ctrl else None
   if not link_state or not os.path.exists(link_state):
-    cands = glob.glob("/sys/bus/platform/devices/*.ssusb/link_state")
+    cands = glob.glob("/sys/kernel/debug/*dwc3*/link_state")
     link_state = cands[0] if cands else None
-    if link_state:
-      ctrl_sysfs = os.path.dirname(link_state)
+  ctrl_sysfs = f"/sys/bus/platform/devices/{ctrl}" if ctrl else None
   return link_state, ctrl_sysfs
 
 
@@ -153,12 +146,10 @@ def main():
       s.ssInactiveCount = counts["ssInactiveCount"]
       s.poweredOffCount = counts["poweredOffCount"]
 
-      # SI counters. linkErrorCount is PORTLI[15:0] from the kernel. There is no kernel
-      # ss_reset_count source, so use the host SS.Inactive entry count: in host mode an
-      # SS.Inactive entry is the SuperSpeed reset event (SS.Inactive -> warm reset).
+      # SI counters
       if ctrl_sysfs is not None:
         s.linkErrorCount = read_int(os.path.join(ctrl_sysfs, "link_error_count"))
-      s.ssResetCount = counts["ssInactiveCount"]
+        s.ssResetCount = read_int(os.path.join(ctrl_sysfs, "ss_reset_count"))
 
       # sleep / power states
       s.runtimeSuspendedMs = read_int(os.path.join(DEVICE, "power/runtime_suspended_time"))
@@ -167,18 +158,6 @@ def main():
 
       # VBUS brownout discriminator
       s.vbusMv = read_vbus_mv()
-
-      # bulk-transfer fault stats exported by tinygrad to /dev/shm; 0 if tinygrad hasn't written it.
-      # recovered>0 = the retry is saving transactions that would otherwise crash/lag modeld.
-      # fatal>0 = retries exhausted (link-level, retry can't save). nodev>0 = hard disconnect.
-      try:
-        be, brc, bf, bnd = (int(x) for x in open("/dev/shm/usbgpu_bulk_stats").read().split()[:4])
-      except Exception:
-        be, brc, bf, bnd = 0, 0, 0, 0
-      s.bulkErrorCount = be
-      s.bulkRecoveredCount = brc
-      s.bulkFatalCount = bf
-      s.bulkNoDeviceCount = bnd
 
       pm.send('usbState', msg)
 
