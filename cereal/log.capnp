@@ -691,32 +691,28 @@ struct UsbState {
   disconnectCount @3 :UInt32;
   overCurrentCount @4 :UInt32;
 
-  # LTSSM: dwc3 link state
-  ltssmState @5 :LtssmState;             # current link state at publish time
+  # LTSSM link state (kernel-sampled)
+  ltssmState @5 :LtssmState;             # current link state
   lastNonU0State @6 :LtssmState;         # last state that wasn't U0
   lastTransitionMonoTime @7 :UInt64;     # monotonic ns of the last LTSSM transition
-  ltssmHistory @8 :List(UInt8);          # ring of recent LtssmState
+  ltssmHistory @8 :List(UInt8);          # ring of recent LtssmState (~240ms)
 
-  # transition counters
-  u1EntryCount @9 :UInt32;               # U1 link sleeps
-  u2EntryCount @10 :UInt32;              # U2 link sleeps
-  u3EntryCount @11 :UInt32;              # U3 suspends
-  recoveryCount @12 :UInt32;             # U0->Recovery entries
-  rxDetectCount @13 :UInt32;             # U0->Rx.Detect entries
-  ssInactiveCount @14 :UInt32;           # SS.Inactive entries
-  poweredOffCount @15 :UInt32;           # controller in low power mode
+  # SS link-event counters (kernel-sampled at 1kHz)
+  recoveryCount @9 :UInt32;              # U0->Recovery entries (best-effort: brief events may undercount)
+  rxDetectCount @10 :UInt32;             # Rx.Detect entries
+  ssInactiveCount @11 :UInt32;           # SS.Inactive entries
+  poweredOffCount @12 :UInt32;           # controller low-power (LPM) entries
 
-  # SI counters from the kernel patch (PORTLI / hub); 0 when the patch isn't present ---
-  linkErrorCount @16 :UInt32;            # xHCI PORTLI Link Error Count [15:0]
-  ssResetCount @17 :UInt32;              # hub.c SuperSpeed reset count
+  # SI: hardware link error counter (exact)
+  linkErrorCount @13 :UInt32;            # xHCI PORTLI Link Error Count [15:0]
 
   # sleep / power management
-  runtimeSuspendedMs @18 :UInt64;        # device power/runtime_suspended_time (rising = it slept)
-  lpmU1Enabled @19 :Bool;                # device usb3_hardware_lpm_u1 currently enabled
-  lpmU2Enabled @20 :Bool;                # device usb3_hardware_lpm_u2 currently enabled
+  runtimeSuspendedMs @14 :UInt64;        # device power/runtime_suspended_time (rising = it slept)
+  lpmU1Enabled @15 :Bool;                # device usb3_hardware_lpm_u1 currently enabled
+  lpmU2Enabled @16 :Bool;                # device usb3_hardware_lpm_u2 currently enabled
 
   # VBUS brownout
-  vbusMv @21 :UInt32;                    # VBUS millivolts
+  vbusMv @17 :UInt32;                    # VBUS millivolts
 
   enum LtssmState {
     unknown @0;
