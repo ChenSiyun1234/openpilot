@@ -170,7 +170,7 @@ def sample_skip(buf, frame_skip):
 
 
 def sample_desire(buf, frame_skip):
-  return buf.reshape(-1, frame_skip, *buf.shape[1:]).max(1).flatten(0, 1).unsqueeze(0)
+  return buf.reshape(-1, frame_skip, *buf.shape[1:])[:, frame_skip - 1].contiguous().flatten(0, 1).unsqueeze(0)
 
 
 def make_warp(nv12, model_w, model_h, frame_skip):
